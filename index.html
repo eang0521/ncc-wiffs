@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>NCC Wiffs — 4v4 Wiffle Ball Simulator</title>
+  <meta name="description" content="A physics-driven 4-v-4 wiffle ball simulator with a 3D field, season mode and editable players." />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='28' fill='%23fff' stroke='%23222' stroke-width='3'/%3E%3Cg fill='%23999'%3E%3Cellipse cx='22' cy='26' rx='4' ry='7'/%3E%3Cellipse cx='32' cy='24' rx='4' ry='7'/%3E%3Cellipse cx='42' cy='26' rx='4' ry='7'/%3E%3C/g%3E%3C/svg%3E" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><span class="ball-ico"></span><span>NCC <b>WIFFS</b></span></div>
+    <nav class="tabs">
+      <button data-view="exhibition" class="active">Exhibition</button>
+      <button data-view="season">Season</button>
+      <button data-view="teams">Teams &amp; Players</button>
+      <button data-view="rules">Rules &amp; Physics</button>
+    </nav>
+  </header>
+
+  <main>
+    <!-- ============ EXHIBITION ============ -->
+    <section id="view-exhibition" class="view active">
+      <div id="ex-setup" class="setup">
+        <div class="setup-card">
+          <h1>Exhibition Game</h1>
+          <p class="muted">Pick two teams and watch the full 3D simulation, or sim straight to the final.</p>
+          <div class="pick">
+            <div class="pick-team"><label>Away</label><select id="ex-away"></select><div class="pick-roster" id="ex-away-roster"></div></div>
+            <div class="vs">at</div>
+            <div class="pick-team"><label>Home</label><select id="ex-home"></select><div class="pick-roster" id="ex-home-roster"></div></div>
+          </div>
+          <div class="setup-opts">
+            <label>Innings <input id="ex-innings" type="number" min="1" max="9" value="3" /></label>
+            <label>Seed <input id="ex-seed" type="text" placeholder="random" /></label>
+            <label>Away manager <select id="ex-mgr-away"><option value="ai">AI</option><option value="manual">You</option></select></label>
+            <label>Home manager <select id="ex-mgr-home"><option value="ai">AI</option><option value="manual">You</option></select></label>
+          </div>
+          <div class="setup-btns">
+            <button id="ex-random">Random matchup</button>
+            <button id="ex-quick">Quick sim (no 3D)</button>
+            <button id="ex-start" class="primary big">Play Ball ▶</button>
+          </div>
+          <div id="ex-quick-result"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ GAME SCREEN (shared by exhibition & season) ============ -->
+    <section id="game-screen" class="game hidden">
+      <div class="game-head"><div id="game-title"></div><button id="btn-exit" class="ghost">✕ Exit game</button></div>
+      <div class="game-grid">
+        <div class="stage-wrap">
+          <div id="stage"></div>
+          <div class="hud">
+            <div id="scorebug" class="scorebug"></div>
+            <div id="pitchinfo" class="pitchinfo"></div>
+            <div id="callout" class="callout"></div>
+            <canvas id="zone" width="150" height="180" title="Strike zone (catcher's view)"></canvas>
+            <div id="atbat" class="atbat"></div>
+            <div id="ticker" class="ticker"></div>
+            <div id="final" class="final hidden"></div>
+          </div>
+        </div>
+        <aside class="controls">
+          <div class="ctl-group">
+            <h5>Playback</h5>
+            <div class="row"><button id="btn-play" class="primary">⏸ Pause</button><button id="btn-step" title="Play one pitch (N)">Next pitch ▸</button></div>
+            <label class="slider">Speed <input type="range" id="speed" min="0" max="7" step="1" /><b id="speedv">1×</b></label>
+            <label class="tog"><input type="checkbox" id="autoplay" checked /> Auto-advance</label>
+          </div>
+          <div class="ctl-group">
+            <h5>Simulate instantly</h5>
+            <div class="grid2">
+              <button data-sim="pitch">Pitch</button>
+              <button data-sim="ab">At-bat</button>
+              <button data-sim="half">Half inning</button>
+              <button data-sim="inning">Full inning</button>
+              <button data-sim="last">To last inning</button>
+              <button data-sim="end">To final</button>
+            </div>
+          </div>
+          <div class="ctl-group">
+            <h5>Camera</h5>
+            <div class="grid3">
+              <button data-cam="auto" class="active">Auto</button>
+              <button data-cam="pitcher">Pitcher</button>
+              <button data-cam="behind">Behind zone</button>
+              <button data-cam="broadcast">Broadcast</button>
+              <button data-cam="high">High home</button>
+              <button data-cam="overhead">Overhead</button>
+              <button data-cam="first">1B side</button>
+              <button data-cam="third">3B side</button>
+              <button data-cam="ball">Follow ball</button>
+              <button data-cam="free">Free (drag)</button>
+            </div>
+          </div>
+          <div class="ctl-group">
+            <h5>Display</h5>
+            <label class="tog"><input type="checkbox" id="opt-labels" checked /> Player labels</label>
+            <label class="tog"><input type="checkbox" id="opt-trail" checked /> Ball trail</label>
+          </div>
+          <p class="muted small">Space = play/pause · N = next pitch</p>
+        </aside>
+        <section class="panels">
+          <div id="linescore"></div>
+          <div class="ptabs">
+            <button data-panel="pbp" class="active">Play-by-play</button>
+            <button data-panel="matchup">Matchup</button>
+            <button data-panel="manager">Manager</button>
+            <button data-panel="box">Box score</button>
+          </div>
+          <div id="panel-body" class="panel-body"></div>
+        </section>
+      </div>
+    </section>
+
+    <!-- ============ SEASON ============ -->
+    <section id="view-season" class="view"><div id="season-root" class="page"></div></section>
+
+    <!-- ============ TEAMS ============ -->
+    <section id="view-teams" class="view"><div id="teams-root" class="page"></div></section>
+
+    <!-- ============ RULES ============ -->
+    <section id="view-rules" class="view">
+      <div class="page prose">
+        <h1>Rules &amp; Physics</h1>
+        <div class="cols">
+          <div>
+            <h3>Field</h3>
+            <ul>
+              <li>Grass field. Bases: 45 ft home→1st, 40 ft 1st→2nd, 40 ft 2nd→3rd, 45 ft 3rd→home (foul lines 90° apart, so 2nd base sits ~56 ft from home).</li>
+              <li>PVC strike zone: 23" wide × 28" tall, bottom 17" off the ground, set 4 ft behind home plate. Mound is 35 ft from the zone.</li>
+              <li>7×7 ft backstop 4 ft behind the zone acts as the "catcher".</li>
+              <li>Five 4-ft-tall fence panels at 60, 65, 70, 65, 60 ft (left to right), stepped where depths change.</li>
+              <li>Bunt line 10 ft in front of home, straight across.</li>
+            </ul>
+            <h3>Play</h3>
+            <ul>
+              <li>4 v 4: P, 1B, SS, OF. Everyone bats. No catcher. Fielders shade by batter handedness and power.</li>
+              <li>4 balls / 3 strikes. Foul balls are strikes, but with two strikes you can only strike out on a <b>foul tip that goes through the zone</b>.</li>
+              <li>A pitch passing through the frame or clipping the PVC is a strike. A pitch that bounces first is a ball.</li>
+              <li>Anything fielded (or stopping) short of the bunt line is foul.</li>
+              <li>Runners actually run the bases. No leading off. Tag-ups, pegging (hitting a runner off base with a thrown ball) and force outs all apply.</li>
+              <li>A throw home that hits the PVC zone or the backstop retires the runner heading home.</li>
+              <li>Over the fence on the fly = home run. Bounces over = ground-rule double. Off the fence = live ball (not a catch).</li>
+              <li>Speed limit: radar 63–64 mph is a warning (one per half inning); the next one, or anything 65+, is an automatic ball. If an over-the-limit pitch is put in play, the play stands.</li>
+              <li>3 innings, no mercy rule; extra innings are played as normal innings.</li>
+            </ul>
+          </div>
+          <div>
+            <h3>Physics model</h3>
+            <ul>
+              <li>Ball: 0.75 oz perforated plastic ball, ~9" circumference, quadratic drag (Cd ≈ 0.40), RK2 integration. Wiffle balls slow down hard: a 50 mph pitch reaches the zone around 30 mph.</li>
+              <li>Pitch movement comes from an aerodynamic side force in the pitcher's frame that ramps in late. Pitch type, pitch level (1–10), movement rating, arm slot and fatigue all set the break. Pitchers aim using the break they <i>expect</i>; the real break varies, so command and movement interact.</li>
+              <li>Batting: the batter perceives location and timing with errors driven by Contact, Eye, pitch break, speed differential (off-speed deception) and <b>familiarity</b>. The bat is a thin cylinder swept around the batter's body; the bat–ball collision uses impulse physics (bat effective mass, COR falling off away from the sweet spot, friction). Pop-ups, grounders, jams, foul tips and barrels all emerge from the collision.</li>
+              <li>Familiarity: every pitch a batter sees of a given type from a given pitcher raises his recognition of it (up to about +36% eye). Managers (AI or you) can swap pitchers between batters to reset it, at a cost if the reliever is weaker.</li>
+              <li>Fatigue: velocity, command and movement fade slightly once a pitcher passes his stamina budget.</li>
+              <li>Batted balls flutter (random side force), bounce irregularly on grass, roll with rolling resistance, and carom off fence panels and the backstop.</li>
+              <li>Fielders predict the ball's path, choose the best interceptor, and react, accelerate and catch based on ratings. Throws are physically simulated (heavy drag makes long throws slow) with accuracy error. The fielder picks the best play: force, throw home at the zone/backstop, peg a runner, tag, or relay.</li>
+              <li>Runners estimate the defense's time to the next base and take extra bases, retreat or tag up accordingly.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

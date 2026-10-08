@@ -1,0 +1,10 @@
+{
+  "name": "ncc-wiffs",
+  "private": true,
+  "type": "module",
+  "description": "NCC Wiffle Ball Simulator - static site (no build step). package.json only enables ES modules for node dev scripts.",
+  "scripts": {
+    "test": "node tools/smoke.mjs",
+    "tune": "node tools/tune.mjs"
+  }
+}
