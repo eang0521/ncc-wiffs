@@ -18,10 +18,11 @@ Live site (after Pages is enabled): **https://eang0521.github.io/ncc-wiffs/**
 
 ## League rules implemented
 
-- Field: 45 ft home→1st, 40 ft 1st→2nd, 40 ft 2nd→3rd, 45 ft 3rd→home (foul lines assumed 90° apart).
+- Field: square infield, 40 ft between every base.
 - Strike zone: a 23"×28" PVC zone, 17" off the ground, set 4 ft behind home and 35 ft from the mound. A pitch through the frame or clipping the pipe is a strike.
 - Backstop: 7×7 ft, 4 ft behind the zone. A throw home that hits the zone or the backstop retires the runner heading home.
-- Fence: five 4-ft panels at 60/65/70/65/60 ft. On the fly = HR, bounced over = ground-rule double, off the fence = live ball.
+- Fence: five connected, equal-length 4-ft panels from foul line to foul line, panel centers at 60/65/70/65/60 ft. On the fly = HR, bounced over = ground-rule double, off the fence = live ball.
+- Only 4 batters: if the batter due up is on base, the player who made the last out takes his place on that base.
 - Bunt line 10 ft from home: anything fielded short of it is foul.
 - Count is 4 balls / 3 strikes. Fouls are strikes, but with two strikes you can only strike out on a foul tip through the zone.
 - No leading off. Tag-ups, pegging and force outs apply.
@@ -38,7 +39,7 @@ Live site (after Pages is enabled): **https://eang0521.github.io/ncc-wiffs/**
 | Pitching | velocity (top mph), control, movement, stamina, arm slot (`over`, `three`, `side`, `under`) |
 | Arsenal | any of `fastball, riser, drop, curve, slider, sweeper, screwball, knuckleball, changeup, cutter, sinker` (screw-drop), `riseslider`, each with a level of 1–10 |
 
-Ratings run 1–99. Pitch level scales that pitch's break, velocity and command.
+Ratings run 1–99. Pitch level scales that pitch's break, velocity and command. The pitching overall (PIT) weighs velocity 25%, control 25%, movement 15% and the arsenal 35%. Arsenal value counts the best pitch most, adds smaller credit for each additional pitch, and rates big late-breaking types (curve, sweeper, riser, drop) above straight ones (fastball, cutter).
 
 ### CSV format
 

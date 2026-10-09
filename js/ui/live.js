@@ -109,7 +109,7 @@ export class LiveGame {
     return {
       defense: g.alignment(b).map((d) => ({ id: d.player.id, role: d.role, pos: d.pos })),
       runners: [1, 2, 3].filter((x) => g.bases[x]).map((x) => ({ id: g.bases[x], base: x })),
-      batterId: b.id, batterSide: b.bats === 'L' ? -1 : 1, pitcherId: g.currentPitcher().id,
+      batterId: b.id, batterSide: b.bats === 'L' ? -1 : 1, pitcherId: g.currentPitcher().id, battingTeam: g.half,
     };
   }
 

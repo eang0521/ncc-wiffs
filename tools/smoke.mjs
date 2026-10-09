@@ -20,7 +20,7 @@ for (let g = 0; g < N; g++) {
     for (const k of ['R','H','HR','BB','K','PA','AB','2B','3B','SF','FC','ROE']) agg[k] += s.bat[k];
     agg.E += s.fld.E; agg.PEG += s.fld.PEG; agg.pitches += s.pit.P; agg.warn += s.pit.warn; agg.auto += s.pit.auto;
   }
-  agg.changes += game.log.filter(l=>l.kind==='sub').length;
+  agg.changes += game.log.filter(l=>l.text.startsWith('Pitching change')).length;
   if (g === 0) sample = game;
 }
 const per = (k) => (agg[k] / agg.games / 2).toFixed(2);

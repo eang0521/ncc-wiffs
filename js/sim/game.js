@@ -45,6 +45,7 @@ export class Game {
     this.paStart = true;
     this.changedThisHalf = [false, false];
     this.decisions = { W: null, L: null };
+    this.lastOut = [null, null];  // most recent player put out, per batting team
     this.leadChange = { team: null, pitcher: [null, null] };
     this.pitchLog = [];          // current at-bat pitch locations for the zone inset
     this.manager = opts.manager || ['ai', 'ai'];
@@ -268,6 +269,31 @@ export class Game {
     t.next = (t.next + 1) % t.order.length;
     this.balls = 0; this.strikes = 0;
     this.paStart = true;
+    if (this.outs < 3) this._swapRunnerAtBat();
+  }
+
+  /**
+   * Only 4 players per side: if the batter due up is standing on a base, the player who made the
+   * team's last out takes his place on that base so he can bat.
+   */
+  _swapRunnerAtBat() {
+    const team = this.battingTeam;
+    const batter = this.currentBatter();
+    const base = [1, 2, 3].find((b) => this.bases[b] === batter.id);
+    if (!base) return;
+    const onBase = new Set([1, 2, 3].map((b) => this.bases[b]).filter(Boolean));
+    let sub = this.lastOut[this.half];
+    if (!sub || onBase.has(sub) || sub === batter.id || !team.byId[sub]) {
+      // fall back to whoever is free, most recent batter first
+      sub = null;
+      for (let k = 1; k <= team.order.length && !sub; k++) {
+        const id = team.order[(team.next - k + team.order.length * 2) % team.order.length];
+        if (id !== batter.id && !onBase.has(id)) sub = id;
+      }
+    }
+    if (!sub) return;
+    this.bases[base] = sub;
+    this._log(`${short(batter)} is due up from ${BASE_NAMES[base]}; ${short(team.byId[sub])} (last out) takes his place on ${BASE_NAMES[base]}.`, 'sub');
   }
 
   _walk(batter, pitcher, rec) {
@@ -299,6 +325,7 @@ export class Game {
     this._log(text);
     rec.text = text;
     this.outs++;
+    this.lastOut[this.half] = batter.id;
     this._endPA();
     this._checkHalfOver();
   }
@@ -344,6 +371,7 @@ export class Game {
     // Outs & fielding credit
     for (const o of outsSorted) {
       this.outs++; ps.outs++;
+      this.lastOut[this.half] = o.id;
       for (const fid of o.by || []) {
         const fs = ftm.stats[fid]?.fld; if (!fs) continue;
         if (o.how === 'peg') fs.PEG++;

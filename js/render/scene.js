@@ -420,6 +420,9 @@ export class FieldView {
     for (const f of this.figures.values()) f.used = false;
     const rec = this.rec;
     const state = rec ? null : this.idle;
+    const batting = rec ? rec.battingTeam : state?.battingTeam;
+    // gloves only for the team in the field
+    for (const f of this.figures.values()) f.fig.userData.glove.visible = batting === undefined || f.team !== batting;
     const t = this.t;
     let ballPos = null;
     const benchSlot = [0, 0];
@@ -476,7 +479,7 @@ export class FieldView {
         if (rec.swing) psi = rec.swing.omega * (t - rec.swing.tPlan);
         const k = rec.swing ? Math.max(-0.9, Math.min(1.4, psi * 0.45)) : -0.9 * 0 - 0.3;
         this._placeFig(rec.batterId, px, CONTACT_Z - 0.05, 'bat', dt, [side, 0], k);
-        this._poseBat(rec, side, px, psi);
+        this._poseBat(rec, side, px, psi, rec.batterId);
       } else if (inPlay) {
         // dropped bat
         const side = rec.swing.side;
@@ -510,7 +513,7 @@ export class FieldView {
         const side = state.batterSide;
         const px = -side * (BAT.sweet + 0.04);
         this._placeFig(state.batterId, px, CONTACT_Z - 0.05, 'bat', dt, [side, 0], -0.3);
-        this._poseBat({ swing: null }, side, px, -9);
+        this._poseBat({ swing: null }, side, px, -9, state.batterId);
       }
       for (const [id, f] of this.figures) if (!f.used) toBench(id);
       const pf = state.pitcherId && this.figures.get(state.pitcherId);
@@ -544,7 +547,7 @@ export class FieldView {
     this._snap = false;
   }
 
-  _poseBat(rec, side, px, psi) {
+  _poseBat(rec, side, px, psi, batterId) {
     const sw = rec.swing;
     const yb = sw ? sw.pivot[1] : 0.85;
     const tanA = sw ? Math.tan(sw.alpha) : 0.15;
@@ -563,13 +566,43 @@ export class FieldView {
       T = sT.map((v, i) => v + (aT[i] - v) * b);
       if (p > 2.0) { const k = Math.min(1, (p - 2.0) / 1.2); T = [T[0], T[1] + k * 0.9, T[2] - k * 0.5]; H = [H[0], H[1] + k * 0.35, H[2]]; }
     }
-    const a = E(...H), b2 = E(...T);
+    let a = E(...H);
+    const b2 = E(...T);
+    const f = this.figures.get(batterId);
+    if (f) a = this._gripBat(f, side, a, b2);
     const dir = new THREE.Vector3().subVectors(b2, a);
+    const len = dir.length();
     this.bat.position.copy(a).addScaledVector(dir, 0.5);
     this.bat.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize());
+    this.bat.scale.set(1, len / BAT.length, 1);
+  }
+
+  /**
+   * Point both arms at the bat handle (bottom hand on the knob, top hand just above it) and
+   * return where the bottom hand actually ended up, so the bat is always held in the hands.
+   */
+  _gripBat(f, side, handle, tip) {
+    const u = f.fig.userData;
+    // RHB: left (lead) hand on the bottom. arms[0] is the figure's right arm, arms[1] its left.
+    const bottom = side > 0 ? u.arms[1] : u.arms[0];
+    const top = side > 0 ? u.arms[0] : u.arms[1];
+    const along = new THREE.Vector3().subVectors(tip, handle).normalize();
+    const down = new THREE.Vector3(0, -1, 0);
+    f.fig.updateMatrixWorld(true);
+    const aim = (arm, target) => {
+      const local = arm.parent.worldToLocal(target.clone()).sub(arm.position);
+      if (local.lengthSq() < 1e-6) return;
+      arm.quaternion.setFromUnitVectors(down, local.normalize());
+    };
+    aim(bottom, handle);
+    aim(top, handle.clone().addScaledVector(along, 0.1));
+    f.fig.updateMatrixWorld(true);
+    const hand = bottom.children[1].getWorldPosition(new THREE.Vector3());
+    return hand.addScaledVector(along, -0.04); // knob just below the bottom hand
   }
 
   _placeBatGround(x, z) {
+    this.bat.scale.set(1, 1, 1);
     this.bat.position.copy(E(x, 0.03, z));
     this.bat.quaternion.setFromEuler(new THREE.Euler(0, 0.7, Math.PI / 2));
   }

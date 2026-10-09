@@ -169,8 +169,21 @@ export function overall(p) {
   const f = (p.field.fielding + p.field.arm + p.field.accuracy + p.field.speed) / 4;
   return Math.round(b * 0.6 + f * 0.4);
 }
+// How much each pitch type is worth to a repertoire at level 10 (big late break > straight stuff).
+export const PITCH_VALUE = {
+  fastball: 0.7, cutter: 0.75, changeup: 0.8, sinker: 0.85, slider: 0.9, screwball: 0.9, knuckleball: 0.9,
+  riser: 0.95, drop: 0.95, riseslider: 0.95, curve: 1.0, sweeper: 1.0,
+};
+const DEPTH = [1, 0.6, 0.35, 0.2, 0.1, 0.05];
+
+/** Repertoire score 0-100 from pitch types and levels (best pitch counts most, depth adds less). */
+export function arsenalScore(p) {
+  const vals = p.pitch.arsenal.map((a) => (a.level / 10) * (PITCH_VALUE[a.type] ?? 0.8)).sort((a, b) => b - a);
+  const max = DEPTH.slice(0, 4).reduce((a, b) => a + b, 0);
+  return clamp(vals.reduce((sum, v, i) => sum + v * (DEPTH[i] ?? 0), 0) / max * 100, 0, 100);
+}
+
 export function pitchingOverall(p) {
   const v = clamp((p.pitch.velocity - 28) / 34 * 100, 0, 100);
-  const lv = p.pitch.arsenal.reduce((a, x) => a + x.level, 0) / Math.max(1, p.pitch.arsenal.length) * 10;
-  return Math.round(v * 0.3 + p.pitch.control * 0.3 + p.pitch.movement * 0.25 + lv * 0.15);
+  return Math.round(v * 0.25 + p.pitch.control * 0.25 + p.pitch.movement * 0.15 + arsenalScore(p) * 0.35);
 }
