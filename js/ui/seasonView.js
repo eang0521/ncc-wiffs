@@ -6,6 +6,13 @@ import { toast } from './teams.js';
 
 const tick = () => new Promise((r) => setTimeout(r, 0));
 
+// Which teams play: all of them, or one half of the team list (as ordered on Teams & Players).
+const LEAGUES = {
+  all: { name: 'All 16 teams', pick: (t) => t },
+  nl: { name: 'National League (first 8 teams)', pick: (t) => t.slice(0, 8) },
+  al: { name: 'American League (last 8 teams)', pick: (t) => t.slice(-8) },
+};
+
 export class SeasonView {
   constructor(root, app) {
     this.root = root; this.app = app;
@@ -21,15 +28,29 @@ export class SeasonView {
     if (!s) {
       this.root.innerHTML = `
         <h1>Season</h1>
-        <p class="muted">Play a full league season with all 16 teams: standings, stat leaders, and a four-team playoff. Rosters are copied from <b>Teams &amp; Players</b> when the season starts.</p>
-        <div class="panel" style="max-width:560px">
+        <p class="muted">Play a full league season: standings, stat leaders, and a four-team playoff. Play all 16 teams together, or just one 8-team league. Rosters are copied from <b>Teams &amp; Players</b> when the season starts.</p>
+        <div class="panel" style="max-width:640px">
           <div class="team-meta">
-            <label>Schedule <select id="ss-cycles"><option value="1">Single round-robin (15 games)</option><option value="2">Double round-robin (30 games)</option></select></label>
+            <label>League <select id="ss-league">${Object.entries(LEAGUES).map(([k, L]) => `<option value="${k}">${L.name}</option>`).join('')}</select></label>
+            <label>Schedule <select id="ss-cycles"></select></label>
             <label>Innings <input id="ss-innings" type="number" min="1" max="9" value="3" /></label>
             <label>Seed <input id="ss-seed" placeholder="random" style="width:110px" /></label>
           </div>
+          <div id="ss-teams" class="ss-teams"></div>
           <button class="primary big" data-act="create">Start season</button>
         </div>`;
+      const sel = this.root.querySelector('#ss-league');
+      const update = () => {
+        const teams = LEAGUES[sel.value].pick(this.app.league);
+        const cyc = this.root.querySelector('#ss-cycles');
+        const prev = cyc.value || '1';
+        const names = ['Single', 'Double', 'Triple', 'Quadruple'];
+        cyc.innerHTML = names.map((nm, i) => `<option value="${i + 1}">${nm} round-robin (${(teams.length - 1) * (i + 1)} games each)</option>`).join('');
+        cyc.value = prev;
+        this.root.querySelector('#ss-teams').innerHTML = teams.map((t) => `<span class="ss-team">${chip(t)} ${esc(t.name)}</span>`).join('');
+      };
+      sel.onchange = update;
+      update();
       return;
     }
     const pr = progress(s);
@@ -53,7 +74,7 @@ export class SeasonView {
     }
     this.root.innerHTML = `
       <h1>Season</h1>
-      <div class="muted">${pr.done} of ${pr.total} regular-season games played · ${s.innings} innings · seed ${s.seed}${s.phase === 'done' ? ' · <b>Season complete</b>' : ''}</div>
+      <div class="muted">${esc(s.leagueName || 'All 16 teams')} · ${pr.done} of ${pr.total} regular-season games played · ${s.innings} innings · seed ${s.seed}${s.phase === 'done' ? ' · <b>Season complete</b>' : ''}</div>
       <div class="progress"><i style="width:${(pr.done / pr.total) * 100}%"></i></div>
       <div class="toolbar">
         <button class="primary" data-act="watchnext" ${nxt ? '' : 'disabled'}>▶ Watch next game</button>
@@ -121,8 +142,11 @@ export class SeasonView {
         const innings = Math.max(1, Math.min(9, Number(this.root.querySelector('#ss-innings').value) || 3));
         const sv = this.root.querySelector('#ss-seed').value.trim();
         const seed = sv ? (Number(sv) || [...sv].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7)) : undefined;
-        if (this.app.league.some((t) => t.players.length < 4)) { toast('Every team needs at least 4 players.'); return; }
-        this.season = createSeason(this.app.league, { cycles, innings, seed });
+        const L = LEAGUES[this.root.querySelector('#ss-league').value];
+        const teams = L.pick(this.app.league);
+        if (teams.some((t) => t.players.length < 4)) { toast('Every team needs at least 4 players.'); return; }
+        this.season = createSeason(teams, { cycles, innings, seed });
+        this.season.leagueName = L.name;
         this.save(); this.render();
         break;
       }

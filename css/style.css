@@ -216,6 +216,8 @@ table { border-collapse: collapse; }
 .leaders .card table { width: 100%; font-size: 12.5px; }
 .leaders .card td { padding: 2px 0; }
 .leaders .card td:last-child { text-align: right; font-weight: 600; }
+.ss-teams { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 14px; }
+.ss-team { display: inline-flex; align-items: center; gap: 6px; background: var(--bg2); border-radius: 6px; padding: 3px 8px 3px 4px; font-size: 13px; }
 .bracket { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 
 .team-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; margin-bottom: 16px; }

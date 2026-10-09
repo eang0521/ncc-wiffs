@@ -13,7 +13,7 @@ Live site (after Pages is enabled): **https://eang0521.github.io/ncc-wiffs/**
   - live scorebug, radar readout with speed-limit warnings, strike-zone pitch chart, play-by-play, line score and box score
   - **Matchup** panel: batter vs pitcher ratings plus a familiarity table showing how often this batter has seen each of the pitcher's pitches today and the resulting eye boost
   - **Manager** panel: AI or manual control per team. Swap pitchers at any time; the panel shows each pitcher's energy and how familiar the opposing lineup is with his stuff
-- **Season mode**: single or double round-robin (15 or 30 games), standings, league leaders, results, a 4-team playoff, and the option to watch any scheduled game in 3D. Saved in your browser.
+- **Season mode**: all 16 teams, or an 8-team **National League** (first 8 teams) or **American League** (last 8 teams); single to quadruple round-robin; standings, league leaders, results, a 4-team playoff, and the option to watch any scheduled game in 3D. Saved in your browser.
 - **Teams & Players editor**: edit every rating, the pitch arsenal and pitch levels, the batting order, team names and colors. Import and export the league as **JSON** or players as **CSV**.
 
 ## League rules implemented
