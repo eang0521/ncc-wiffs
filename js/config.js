@@ -48,61 +48,48 @@ const secondZ = first[1] + Math.sqrt(Math.max(0, FIELD.firstToSecond ** 2 - firs
 FIELD.bases = [[0, 0], first, [0, secondZ], third];
 FIELD.baseDist = [FIELD.homeToFirst, FIELD.firstToSecond, FIELD.secondToThird, FIELD.thirdToHome];
 
-// Fence: connected straight panels of equal length, forming one smooth polyline from foul line to
-// foul line. Each panel's midpoint sits at its listed distance from home (60/65/70/65/60 ft).
-// Solved numerically from the center panel outward (expects an odd, symmetric list of distances).
+// Fence: one smooth arc from foul line to foul line. The fair arc is split into equal sectors (one per
+// panel); the fence distance passes exactly through each panel's listed distance at the panel's
+// center angle (60/65/70/65/60 ft) and is interpolated smoothly (Catmull-Rom) in between. The curve
+// is sampled into short straight pieces for physics and rendering.
 function buildFence() {
   const D = FIELD.fencePanels;
-  const n = D.length, c = (n - 1) / 2;
-  const bisect = (f, lo, hi, it = 60) => {
-    const flo = f(lo);
-    for (let i = 0; i < it; i++) { const m = (lo + hi) / 2; if ((f(m) > 0) === (flo > 0)) lo = m; else hi = m; }
-    return (lo + hi) / 2;
+  const n = D.length;
+  const sector = (2 * half) / n;
+  const centers = D.map((d, i) => ({ ang: -half + sector * (i + 0.5), d }));
+  // control points, extrapolated one sector past each end
+  const P = [2 * D[0] - D[1], ...D, 2 * D[n - 1] - D[n - 2]];
+  const radiusAt = (ang) => {
+    const u = (ang + half) / sector - 0.5 + 1;      // position in control-point index space
+    const i = Math.max(1, Math.min(n, Math.floor(u)));
+    const t = u - i;
+    const p0 = P[i - 1], p1 = P[i], p2 = P[Math.min(P.length - 1, i + 1)], p3 = P[Math.min(P.length - 1, i + 2)];
+    return 0.5 * (2 * p1 + (-p0 + p2) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t * t + (-p0 + 3 * p1 - 3 * p2 + p3) * t * t * t);
   };
-  // Heading for the next panel whose midpoint hits the target distance, closest to going straight.
-  const root = (f, prev) => {
-    const s0 = f(prev) > 0, step = Math.PI / 180;
-    for (let k = 1; k <= 120; k++) {
-      if ((f(prev + k * step) > 0) !== s0) return bisect(f, prev + (k - 1) * step, prev + k * step);
-      if ((f(prev - k * step) > 0) !== s0) return bisect(f, prev - k * step, prev - (k - 1) * step);
-    }
-    return prev;
-  };
-  // Given panel length L, walk left from the center panel; return the left-end vertex chain.
-  const chain = (L) => {
-    const left = [[-L / 2, D[c]]];               // left end of the center panel (z = its distance)
-    let prevAng = Math.PI;                        // heading of the previous panel (walking leftward)
-    for (let k = c - 1; k >= 0; k--) {
-      const v = left[left.length - 1];
-      const mid = (ang) => Math.hypot(v[0] + Math.cos(ang) * L / 2, v[1] + Math.sin(ang) * L / 2) - D[k];
-      const ang = root(mid, prevAng);
-      left.push([v[0] + Math.cos(ang) * L, v[1] + Math.sin(ang) * L]);
-      prevAng = ang;
-    }
-    return left;
-  };
-  // Choose L so the outermost vertex lands on the foul line.
-  const endAngle = (L) => { const ch = chain(L); const e = ch[ch.length - 1]; return Math.atan2(-e[0], e[1]) - half; };
-  const L = bisect(endAngle, 12 * FT, 26 * FT);
-  const left = chain(L).reverse();                // V0 (left foul line) ... left end of center panel
-  const verts = [...left, ...left.slice().reverse().map(([x, z]) => [-x, z])];
-  const segs = [], panels = [];
-  for (let i = 0; i < n; i++) {
-    const a = verts[i], b = verts[i + 1];
-    const dx = b[0] - a[0], dz = b[1] - a[1], len = Math.hypot(dx, dz);
-    let nrm = [dz / len, -dx / len];               // perpendicular; make it point away from home
-    const m = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
-    if (nrm[0] * m[0] + nrm[1] * m[1] < 0) nrm = [-nrm[0], -nrm[1]];
-    segs.push({ a, b, n: nrm, panel: i });
-    panels.push({ d: D[i], p0: a, p1: b, u: nrm, len });
+  const N = 18 * n;
+  const pts = [];
+  for (let k = 0; k <= N; k++) {
+    const ang = -half + (2 * half * k) / N;
+    const r = radiusAt(ang);
+    pts.push([Math.sin(ang) * r, Math.cos(ang) * r]);
   }
-  return { segs, panels, verts, length: L };
+  const segs = [];
+  for (let k = 0; k < N; k++) {
+    const a = pts[k], b = pts[k + 1];
+    const dx = b[0] - a[0], dz = b[1] - a[1], len = Math.hypot(dx, dz);
+    let nrm = [dz / len, -dx / len];
+    if (nrm[0] * (a[0] + b[0]) + nrm[1] * (a[1] + b[1]) < 0) nrm = [-nrm[0], -nrm[1]];
+    const mid = Math.atan2((a[0] + b[0]) / 2, (a[1] + b[1]) / 2);
+    segs.push({ a, b, n: nrm, panel: Math.max(0, Math.min(n - 1, Math.floor((mid + half) / sector))) });
+  }
+  return { segs, pts, centers, radiusAt, sector };
 }
 const fence = buildFence();
 FIELD.fenceSegs = fence.segs;
-FIELD.fencePanelInfo = fence.panels;
-FIELD.fenceVerts = fence.verts;
-FIELD.fencePanelLength = fence.length;
+FIELD.fencePoints = fence.pts;
+FIELD.fenceCenters = fence.centers;
+FIELD.fenceRadiusAt = fence.radiusAt;
+FIELD.fenceSector = fence.sector;
 
 // ---------------- Ball / physics ----------------
 export const BALL = {

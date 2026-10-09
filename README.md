@@ -21,7 +21,7 @@ Live site (after Pages is enabled): **https://eang0521.github.io/ncc-wiffs/**
 - Field: square infield, 40 ft between every base.
 - Strike zone: a 23"×28" PVC zone, 17" off the ground, set 4 ft behind home and 35 ft from the mound. A pitch through the frame or clipping the pipe is a strike.
 - Backstop: 7×7 ft, 4 ft behind the zone. A throw home that hits the zone or the backstop retires the runner heading home.
-- Fence: five connected, equal-length 4-ft panels from foul line to foul line, panel centers at 60/65/70/65/60 ft. On the fly = HR, bounced over = ground-rule double, off the fence = live ball.
+- Fence: a 4-ft fence in one smooth arc from foul line to foul line, passing through 60/65/70/65/60 ft at the five panel centers (about 57.5 ft at the foul lines). On the fly = HR, bounced over = ground-rule double, off the fence = live ball.
 - Only 4 batters: if the batter due up is on base, the player who made the last out takes his place on that base.
 - Bunt line 10 ft from home: anything fielded short of it is foul.
 - Count is 4 balls / 3 strikes. Fouls are strikes, but with two strikes you can only strike out on a foul tip through the zone.

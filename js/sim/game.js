@@ -103,6 +103,22 @@ export class Game {
     };
   }
 
+  statsView() {
+    return JSON.parse(JSON.stringify({
+      teams: this.teams.map((t) => ({ stats: t.stats, roles: t.roles, pitchersUsed: t.pitchersUsed, next: t.next })),
+      fam: this.fam, pitchCount: this.pitchCount, half: this.half, inning: this.inning, outs: this.outs,
+      balls: this.balls, strikes: this.strikes, bases: this.bases, over: this.over,
+    }));
+  }
+
+  /** A read-only stand-in for this game that reports the stats captured in `view`. */
+  frozen(view) {
+    const g = Object.create(this);
+    g.teams = this.teams.map((t, i) => Object.assign(Object.create(t), view.teams[i]));
+    for (const k of ['fam', 'pitchCount', 'half', 'inning', 'outs', 'balls', 'strikes', 'bases', 'over']) g[k] = view[k];
+    return g;
+  }
+
   /** Defensive alignment for this batter (meters, [x,z]). */
   alignment(batter) {
     const t = this.fieldingTeam;
@@ -173,6 +189,9 @@ export class Game {
       this.pitchLog = [];
     }
     const before = this.snapshot();
+    // Frozen copy of everything the HUD shows, so the live view can keep showing pre-pitch stats
+    // until the play has finished animating.
+    const view = record ? this.statsView() : null;
     const bt = this.battingTeam, ft = this.fieldingTeam;
     const batter = this.currentBatter();
     const pitcher = this.currentPitcher();
@@ -197,7 +216,7 @@ export class Game {
     ps.P++; ps.maxVelo = Math.max(ps.maxVelo, pitch.radar);
 
     const rec = {
-      kind: 'pitch', before, batterId: batter.id, pitcherId: pitcher.id,
+      kind: 'pitch', before, view, batterId: batter.id, pitcherId: pitcher.id,
       battingTeam: this.half, defense: this.alignment(batter).map((d) => ({ id: d.player.id, role: d.role, pos: d.pos })),
       runnersBefore: [1, 2, 3].filter((b) => this.bases[b]).map((b) => ({ id: this.bases[b], base: b })),
       pitch: {

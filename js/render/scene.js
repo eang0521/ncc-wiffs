@@ -310,26 +310,46 @@ export class FieldView {
     // Fence panels
     const pad = new THREE.MeshStandardMaterial({ color: 0x1f4e79, roughness: 0.85 });
     const cap = new THREE.MeshStandardMaterial({ color: 0xf2c230, roughness: 0.5 });
+    const H = FIELD.fenceHeight;
     for (const s of FIELD.fenceSegs) {
       const a = s.a, b = s.b;
       const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
-      const H = FIELD.fenceHeight;
       const grp = new THREE.Group();
-      const panel = new THREE.Mesh(new THREE.BoxGeometry(len + 0.06, H, 0.06), pad);
+      const panel = new THREE.Mesh(new THREE.BoxGeometry(len + 0.02, H, 0.06), pad);
       panel.position.y = H / 2; panel.castShadow = true; panel.receiveShadow = true;
-      const top = new THREE.Mesh(new THREE.BoxGeometry(len + 0.08, 0.07, 0.09), cap);
+      const top = new THREE.Mesh(new THREE.BoxGeometry(len + 0.03, 0.07, 0.09), cap);
       top.position.y = H;
       grp.add(panel, top);
       grp.position.copy(E((a[0] + b[0]) / 2, 0, (a[1] + b[1]) / 2));
       grp.rotation.y = Math.atan2(-(b[1] - a[1]), -(b[0] - a[0]));
-      if (!s.connector) {
-        const lbl = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 0.6), new THREE.MeshBasicMaterial({ map: textTexture(String(Math.round(FIELD.fencePanels[s.panel] / FT)), { fg: '#ffffff' }), transparent: true }));
-        lbl.position.set(0, H * 0.55, -0.035);
-        lbl.rotation.y = Math.PI;
-        grp.add(lbl);
-        const lbl2 = lbl.clone(); lbl2.position.z = 0.035; lbl2.rotation.y = 0; grp.add(lbl2);
-      }
       S.add(grp);
+    }
+    // panel seams (posts) and distance markers at each panel's center
+    const postMat = new THREE.MeshStandardMaterial({ color: 0x173a5a, roughness: 0.8 });
+    const n = FIELD.fencePanels.length;
+    for (let i = 0; i <= n; i++) {
+      const ang = -FIELD.foulHalfAngle + FIELD.fenceSector * i;
+      const r = FIELD.fenceRadiusAt(ang);
+      const post = new THREE.Mesh(new THREE.BoxGeometry(0.1, H + 0.12, 0.1), postMat);
+      post.position.copy(E(Math.sin(ang) * r, (H + 0.12) / 2, Math.cos(ang) * r));
+      post.castShadow = true;
+      S.add(post);
+    }
+    for (const c of FIELD.fenceCenters) {
+      // local fence direction at the panel center, so markers sit flat on the curve
+      const at = (ang) => { const r = FIELD.fenceRadiusAt(ang); return [Math.sin(ang) * r, Math.cos(ang) * r]; };
+      const p = at(c.ang), p0 = at(c.ang - 0.01), p1 = at(c.ang + 0.01);
+      const tx = p1[0] - p0[0], tz = p1[1] - p0[1], tl = Math.hypot(tx, tz);
+      let nx = tz / tl, nz = -tx / tl;
+      if (nx * p[0] + nz * p[1] < 0) { nx = -nx; nz = -nz; }   // outward normal
+      const tex = textTexture(String(Math.round(c.d / FT)), { fg: '#ffffff' });
+      for (const side of [-1, 1]) {
+        const lbl = new THREE.Mesh(new THREE.PlaneGeometry(1.0, 0.5), new THREE.MeshBasicMaterial({ map: tex, transparent: true }));
+        const o = side * 0.07;
+        lbl.position.copy(E(p[0] + nx * o, H * 0.55, p[1] + nz * o));
+        lbl.lookAt(E(p[0] + nx * side * 5, H * 0.55, p[1] + nz * side * 5));
+        S.add(lbl);
+      }
     }
 
     // Trees & surroundings
@@ -675,15 +695,21 @@ export class FieldView {
       T = sT.map((v, i) => v + (aT[i] - v) * b);
       if (p > 2.0) { const k = Math.min(1, (p - 2.0) / 1.2); T = [T[0], T[1] + k * 0.9, T[2] - k * 0.5]; H = [H[0], H[1] + k * 0.35, H[2]]; }
     }
+    const f = this.figures.get(batterId);
+    // The batter may still be walking up from the bench: carry the bat with his actual position.
+    if (f) {
+      const dx = f.pos[0] - px, dz = f.pos[1] - (CONTACT_Z - 0.05);
+      H = [H[0] + dx, H[1], H[2] + dz];
+      T = [T[0] + dx, T[1], T[2] + dz];
+    }
     let a = E(...H);
     const b2 = E(...T);
-    const f = this.figures.get(batterId);
     if (f) a = this._gripBat(f, side, a, b2);
-    const dir = new THREE.Vector3().subVectors(b2, a);
-    const len = dir.length();
-    this.bat.position.copy(a).addScaledVector(dir, 0.5);
-    this.bat.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize());
-    this.bat.scale.set(1, len / BAT.length, 1);
+    // Bat keeps its real length, pointing from the hands toward the swing path.
+    const dir = new THREE.Vector3().subVectors(b2, a).normalize();
+    this.bat.position.copy(a).addScaledVector(dir, BAT.length / 2);
+    this.bat.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+    this.bat.scale.set(1, 1, 1);
   }
 
   /**

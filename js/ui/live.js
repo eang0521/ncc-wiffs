@@ -265,8 +265,15 @@ export class LiveGame {
     $('#linescore', this.root).innerHTML = lineScore(g, this.snap);
   }
 
-  refreshPanel() {
+  /** What the HUD should show: during playback, stats as they were before the pitch. */
+  get shown() {
     const g = this.game;
+    if (g && this.busy && this.rec?.view) return (this._frozenFor === this.rec ? this._frozen : (this._frozenFor = this.rec, this._frozen = g.frozen(this.rec.view)));
+    return g;
+  }
+
+  refreshPanel() {
+    const g = this.shown;
     if (!g) return;
     const body = $('#panel-body', this.root);
     if (this.panel === 'pbp') body.innerHTML = logHTML(g, this.visibleLog);
@@ -276,7 +283,7 @@ export class LiveGame {
   }
 
   refresh() {
-    const g = this.game;
+    const g = this.shown;
     if (!g) return;
     this.refreshScore();
     this.refreshPanel();
