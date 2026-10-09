@@ -1,6 +1,7 @@
 // Stylized low-poly player figures with simple procedural animation.
 import * as THREE from 'three';
 
+export const UPPER = 0.3, FORE = 0.3; // arm bone lengths (m)
 const SKIN = [0xf1c27d, 0xe0ac69, 0xc68642, 0x8d5524, 0xffdbac, 0xd4a373];
 
 function numberTexture(num, fg, bg, name) {
@@ -102,11 +103,18 @@ export function makeFigure(opts) {
   for (const sx of [-1, 1]) {
     const pivot = new THREE.Group();
     pivot.position.set(sx * 0.23, 0.55, 0);
-    const arm = new THREE.Mesh(new THREE.CapsuleGeometry(0.05, 0.5, 3, 8), jersey);
-    arm.position.y = -0.3; arm.castShadow = true;
+    // upper arm + elbow joint + forearm, so hands can be placed with two-bone IK
+    const upper = new THREE.Mesh(new THREE.CapsuleGeometry(0.052, 0.22, 3, 8), jersey);
+    upper.position.y = -UPPER / 2; upper.castShadow = true;
+    const elbow = new THREE.Group();
+    elbow.position.y = -UPPER;
+    const fore = new THREE.Mesh(new THREE.CapsuleGeometry(0.045, 0.22, 3, 8), skin);
+    fore.position.y = -FORE / 2; fore.castShadow = true;
     const hand = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 6), skin);
-    hand.position.y = -0.6;
-    pivot.add(arm, hand);
+    hand.position.y = -FORE;
+    elbow.add(fore, hand);
+    pivot.add(upper, elbow);
+    pivot.userData = { elbow, hand };
     torso.add(pivot);
     arms.push(pivot);
   }
@@ -114,8 +122,8 @@ export function makeFigure(opts) {
   const gloveHand = opts.throws === 'L' ? arms[0] : arms[1];
   const gl = new THREE.Mesh(new THREE.SphereGeometry(0.085, 10, 8), glove);
   gl.scale.set(1, 1.2, 0.6);
-  gl.position.y = -0.62;
-  gloveHand.add(gl);
+  gl.position.y = -FORE - 0.02;
+  gloveHand.userData.elbow.add(gl);
 
   const s = opts.scale || 1;
   g.scale.set(s, s, s);
@@ -131,7 +139,8 @@ export function pose(fig, kind, k = 0, dt = 0, speed = 0) {
   u.body.position.y = 0;
   u.torso.rotation.set(0, 0, 0);
   u.body.rotation.set(0, 0, 0);
-  for (const a of u.arms) a.rotation.set(0, 0, 0);
+  for (const a of u.arms) { a.rotation.set(0, 0, 0); a.userData.elbow.rotation.set(-0.15, 0, 0); }
+  const elbows = (x) => { for (const a of u.arms) a.userData.elbow.rotation.x = x; };
   lL.rotation.set(0, 0, 0); lR.rotation.set(0, 0, 0);
   switch (kind) {
     case 'run': {
@@ -139,6 +148,7 @@ export function pose(fig, kind, k = 0, dt = 0, speed = 0) {
       const sw = Math.sin(u.phase) * Math.min(1, 0.35 + speed * 0.12);
       lL.rotation.x = sw * 0.9; lR.rotation.x = -sw * 0.9;
       u.arms[0].rotation.x = -sw * 0.9; u.arms[1].rotation.x = sw * 0.9;
+      elbows(-1.4);
       u.torso.rotation.x = 0.18;
       u.body.position.y = Math.abs(Math.cos(u.phase)) * 0.05;
       break;
@@ -148,6 +158,7 @@ export function pose(fig, kind, k = 0, dt = 0, speed = 0) {
       lL.rotation.x = -0.35; lR.rotation.x = -0.35; lL.rotation.z = 0.15; lR.rotation.z = -0.15;
       u.torso.rotation.x = 0.45;
       u.arms[0].rotation.x = -0.7; u.arms[1].rotation.x = -0.7;
+      elbows(-0.5);
       break;
     case 'field':
       u.body.position.y = -0.22;

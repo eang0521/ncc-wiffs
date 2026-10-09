@@ -146,7 +146,7 @@ export function stepBall(ball, dt, rng = null) {
     }
   }
 
-  // Backstop (7x7 ft board 4 ft behind the PVC zone)
+  // Backstop: a 7x7 ft net 4 ft behind the PVC zone (soaks up most of the ball's speed)
   const bz = FIELD.backstopZ;
   if (prev[2] > bz && ball.p[2] <= bz && ball.v[2] < 0) {
     const t = (prev[2] - bz) / (prev[2] - ball.p[2]);
@@ -154,7 +154,7 @@ export function stepBall(ball, dt, rng = null) {
     const y = prev[1] + (ball.p[1] - prev[1]) * t;
     if (Math.abs(x) <= FIELD.backstopSize / 2 + R && y <= FIELD.backstopSize + R) {
       ball.p[2] = bz + 0.02;
-      ball.v[2] = -ball.v[2] * 0.25; ball.v[0] *= 0.5; ball.v[1] *= 0.5;
+      ball.v[2] = -ball.v[2] * 0.12; ball.v[0] *= 0.35; ball.v[1] *= 0.35;
       ball.flutter = null;
       if (ball.rolling) ball.v[1] = 0;
       events.push({ type: 'backstop', p: [ball.p[0], y, bz], x, y });
@@ -168,6 +168,13 @@ export function stepBall(ball, dt, rng = null) {
     const x = prev[0] + (ball.p[0] - prev[0]) * t;
     const y = prev[1] + (ball.p[1] - prev[1]) * t;
     events.push({ type: 'zoneCross', x, y, inZone: inStrikeZone(x, y), grounded: ball.grounded, t: ball.t + dt * t });
+    // Tin plate zip-tied inside the frame: the ball clanks off it back toward the field
+    if (Math.abs(x) <= FIELD.plateW / 2 + R && Math.abs(y - FIELD.zoneCenterY) <= FIELD.plateH / 2 + R && ball.v[2] < 0) {
+      ball.p = [x, y, zz + R + 0.005];
+      ball.v[2] = -ball.v[2] * 0.3; ball.v[0] *= 0.7; ball.v[1] *= 0.7;
+      ball.flutter = null; ball.accel = null; ball.rolling = false;
+      events.push({ type: 'plate', x, y, p: [...ball.p] });
+    }
   }
 
   ball.t += dt;

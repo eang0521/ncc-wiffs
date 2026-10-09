@@ -4,7 +4,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { FIELD, FT, BAT, BALL } from '../config.js';
-import { makeFigure, pose, labelSprite } from './figures.js';
+import { makeFigure, pose, labelSprite, UPPER, FORE } from './figures.js';
 import { accentFor } from '../data/teams.js';
 
 const E = (x, y, z) => new THREE.Vector3(-x, y, z);
@@ -48,6 +48,29 @@ function textTexture(text, { w = 256, h = 128, fg = '#fff', bg = null, font = 'b
   return t;
 }
 
+// Galvanized tin: speckled spangle pattern with a couple of ball dents
+function tinTexture() {
+  const c = document.createElement('canvas');
+  c.width = 128; c.height = 160;
+  const g = c.getContext('2d');
+  g.fillStyle = '#c9cdd1'; g.fillRect(0, 0, 128, 160);
+  let s = 3;
+  const rnd = () => (s = (s * 16807) % 2147483647) / 2147483647;
+  for (let i = 0; i < 260; i++) {
+    const v = 175 + Math.floor(rnd() * 70);
+    g.fillStyle = `rgba(${v},${v + 3},${v + 6},0.55)`;
+    g.beginPath(); g.ellipse(rnd() * 128, rnd() * 160, 3 + rnd() * 9, 2 + rnd() * 7, rnd() * 3, 0, Math.PI * 2); g.fill();
+  }
+  for (const [x, y] of [[52, 70], [80, 98], [60, 112]]) {
+    const gr = g.createRadialGradient(x, y, 1, x, y, 10);
+    gr.addColorStop(0, 'rgba(70,74,78,0.5)'); gr.addColorStop(1, 'rgba(70,74,78,0)');
+    g.fillStyle = gr; g.fillRect(x - 10, y - 10, 20, 20);
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
 function tubeBetween(a, b, r, mat) {
   const dir = new THREE.Vector3().subVectors(b, a);
   const len = dir.length();
@@ -56,6 +79,38 @@ function tubeBetween(a, b, r, mat) {
   m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize());
   m.castShadow = true;
   return m;
+}
+
+const DOWN = new THREE.Vector3(0, -1, 0);
+/**
+ * Two-bone arm IK: bend the elbow (pointing down and out) so the hand lands on `target` (world).
+ * If the target is out of reach the arm straightens toward it.
+ */
+function aimArm(shoulder, target, scale) {
+  const elbow = shoulder.userData.elbow;
+  const a = UPPER * scale, b = FORE * scale;
+  const S = shoulder.getWorldPosition(new THREE.Vector3());
+  const toT = new THREE.Vector3().subVectors(target, S);
+  const L = Math.min(Math.max(toT.length(), Math.abs(a - b) + 1e-3), a + b - 1e-4);
+  const dHat = toT.normalize();
+  // elbow drops down and slightly away from the body
+  const pole = new THREE.Vector3(0, -1, 0);
+  pole.sub(dHat.clone().multiplyScalar(pole.dot(dHat)));
+  if (pole.lengthSq() < 1e-6) pole.set(1, 0, 0);
+  pole.normalize();
+  const cosA = (a * a + L * L - b * b) / (2 * a * L);
+  const sinA = Math.sqrt(Math.max(0, 1 - cosA * cosA));
+  const E = S.clone().addScaledVector(dHat, a * cosA).addScaledVector(pole, a * sinA);
+  const T = S.clone().addScaledVector(dHat, L);
+  // shoulder: point the upper arm at the elbow (in the torso's space)
+  const parent = shoulder.parent;
+  const eLocal = parent.worldToLocal(E.clone()).sub(shoulder.position);
+  shoulder.quaternion.setFromUnitVectors(DOWN, eLocal.normalize());
+  shoulder.updateMatrixWorld(true);
+  // elbow: point the forearm at the hand target (in the upper arm's space)
+  const tLocal = shoulder.worldToLocal(T.clone()).sub(elbow.position);
+  elbow.quaternion.setFromUnitVectors(DOWN, tLocal.normalize());
+  elbow.updateMatrixWorld(true);
 }
 
 export class FieldView {
@@ -185,18 +240,72 @@ export class FieldView {
       S.add(tubeBetween(E(sx * zw, 0.02, zz), E(sx * zw, zb, zz), r, pvc));
       S.add(tubeBetween(E(sx * zw, 0.02, zz - 0.25), E(sx * zw, 0.02, zz + 0.25), r, pvc));
     }
-    // backstop board
+    // Tin plate hung inside the frame with zip ties
+    const pw = FIELD.plateW / 2, ph = FIELD.plateH / 2, zc = FIELD.zoneCenterY;
+    const tin = new THREE.Mesh(new THREE.BoxGeometry(FIELD.plateW, FIELD.plateH, 0.003),
+      new THREE.MeshStandardMaterial({ map: tinTexture(), color: 0xf0f2f4, metalness: 0.15, roughness: 0.45, emissive: 0x3a3e42 }));
+    tin.position.copy(E(0, zc, zz));
+    tin.castShadow = true; tin.receiveShadow = true;
+    S.add(tin);
+    const tieMat = new THREE.MeshStandardMaterial({ color: 0x121212, roughness: 0.6 });
+    const tie = (plateX, plateY, pipeX, pipeY, horizontalPipe) => {
+      const a = E(plateX, plateY, zz), b = E(pipeX, pipeY, zz);
+      const strap = tubeBetween(a, b, 0.0028, tieMat);
+      strap.castShadow = false;
+      S.add(strap);
+      const loop = new THREE.Mesh(new THREE.TorusGeometry(r + 0.003, 0.0026, 6, 14), tieMat);
+      loop.position.copy(b);
+      if (horizontalPipe) loop.rotation.y = Math.PI / 2; else loop.rotation.x = Math.PI / 2;
+      S.add(loop);
+    };
+    const inset = 0.035; // ties sit a little in from each plate corner
+    for (const sx of [-1, 1]) for (const sy of [-1, 1]) {
+      const cx = sx * pw, cy = zc + sy * ph;
+      tie(cx - sx * inset, cy, cx - sx * inset, zc + sy * (FIELD.zoneHeight / 2), true);   // to top/bottom pipe
+      tie(cx, cy - sy * inset, sx * zw, cy - sy * inset, false);                           // to side pipe
+    }
+    for (const sy of [-1, 1]) tie(0, zc + sy * ph, 0, zc + sy * (FIELD.zoneHeight / 2), true);
+    for (const sx of [-1, 1]) tie(sx * pw, zc, sx * zw, zc, false);
+
+    // Backstop: 7x7 ft net on a wooden frame (mostly see-through)
     const bs = FIELD.backstopSize;
-    const back = new THREE.Mesh(new THREE.BoxGeometry(bs, bs, 0.04), new THREE.MeshStandardMaterial({ color: 0x24303a, roughness: 0.9 }));
-    back.position.copy(E(0, bs / 2, FIELD.backstopZ - 0.02));
-    back.castShadow = true; back.receiveShadow = true;
-    S.add(back);
+    const netTex = (() => {
+      const c = document.createElement('canvas'); c.width = c.height = 128;
+      const g = c.getContext('2d');
+      g.strokeStyle = 'rgba(20,24,28,1)'; g.lineWidth = 7;
+      g.beginPath();
+      g.moveTo(0, 0); g.lineTo(128, 128); g.moveTo(128, 0); g.lineTo(0, 128);
+      g.moveTo(-64, 64); g.lineTo(64, -64); g.moveTo(64, 192); g.lineTo(192, 64);
+      g.moveTo(64, -64); g.lineTo(192, 64); g.moveTo(-64, 64); g.lineTo(64, 192);
+      g.stroke();
+      const t = new THREE.CanvasTexture(c);
+      t.wrapS = t.wrapT = THREE.RepeatWrapping;
+      t.repeat.set(26, 26);
+      t.anisotropy = 8;
+      return t;
+    })();
+    const net = new THREE.Mesh(new THREE.PlaneGeometry(bs, bs),
+      new THREE.MeshStandardMaterial({ map: netTex, transparent: true, alphaTest: 0.35, side: THREE.DoubleSide, roughness: 0.9, color: 0x2a2f34 }));
+    net.position.copy(E(0, bs / 2, FIELD.backstopZ));
+    S.add(net);
+    const wood = new THREE.MeshStandardMaterial({ color: 0x8a6a45, roughness: 0.8 });
     for (const sx of [-1, 1]) {
-      const post = new THREE.Mesh(new THREE.BoxGeometry(0.09, bs + 0.15, 0.09), new THREE.MeshStandardMaterial({ color: 0x8a6a45 }));
-      post.position.copy(E(sx * (bs / 2 + 0.04), (bs + 0.15) / 2, FIELD.backstopZ - 0.06));
+      const post = new THREE.Mesh(new THREE.BoxGeometry(0.09, bs + 0.15, 0.09), wood);
+      post.position.copy(E(sx * (bs / 2 + 0.04), (bs + 0.15) / 2, FIELD.backstopZ - 0.05));
       post.castShadow = true;
       S.add(post);
+      const foot = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.09, 1.0), wood);
+      foot.position.copy(E(sx * (bs / 2 + 0.04), 0.045, FIELD.backstopZ - 0.3));
+      foot.castShadow = true;
+      S.add(foot);
     }
+    const bar = new THREE.Mesh(new THREE.BoxGeometry(bs + 0.17, 0.08, 0.08), wood);
+    bar.position.copy(E(0, bs + 0.11, FIELD.backstopZ - 0.05));
+    bar.castShadow = true;
+    S.add(bar);
+    const rope = new THREE.Mesh(new THREE.BoxGeometry(bs, 0.025, 0.025), tieMat);
+    rope.position.copy(E(0, 0.02, FIELD.backstopZ));
+    S.add(rope);
 
     // Fence panels
     const pad = new THREE.MeshStandardMaterial({ color: 0x1f4e79, roughness: 0.85 });
@@ -489,7 +598,7 @@ export class FieldView {
       if (t < -0.04) {
         const pf = this.figures.get(rec.pitcherId);
         if (pf) {
-          const hand = pf.fig.userData.throwArm.children[1];
+          const hand = pf.fig.userData.throwArm.userData.hand;
           ballPos = hand.getWorldPosition(new THREE.Vector3());
         }
       } else if (inPlay) {
@@ -517,7 +626,7 @@ export class FieldView {
       }
       for (const [id, f] of this.figures) if (!f.used) toBench(id);
       const pf = state.pitcherId && this.figures.get(state.pitcherId);
-      if (pf) { pf.fig.updateMatrixWorld(true); ballPos = pf.fig.userData.gloveArm.children[1].getWorldPosition(new THREE.Vector3()); }
+      if (pf) { pf.fig.updateMatrixWorld(true); ballPos = pf.fig.userData.gloveArm.userData.hand.getWorldPosition(new THREE.Vector3()); }
     } else {
       for (const [id, f] of this.figures) if (!f.used) toBench(id);
     }
@@ -587,19 +696,16 @@ export class FieldView {
     const bottom = side > 0 ? u.arms[1] : u.arms[0];
     const top = side > 0 ? u.arms[0] : u.arms[1];
     const along = new THREE.Vector3().subVectors(tip, handle).normalize();
-    const down = new THREE.Vector3(0, -1, 0);
     f.fig.updateMatrixWorld(true);
-    const aim = (arm, target) => {
-      const local = arm.parent.worldToLocal(target.clone()).sub(arm.position);
-      if (local.lengthSq() < 1e-6) return;
-      arm.quaternion.setFromUnitVectors(down, local.normalize());
-    };
-    aim(bottom, handle);
-    aim(top, handle.clone().addScaledVector(along, 0.1));
+    const S = this.figScale(f);
+    aimArm(bottom, handle, S);
+    aimArm(top, handle.clone().addScaledVector(along, 0.1), S);
     f.fig.updateMatrixWorld(true);
-    const hand = bottom.children[1].getWorldPosition(new THREE.Vector3());
+    const hand = bottom.userData.hand.getWorldPosition(new THREE.Vector3());
     return hand.addScaledVector(along, -0.04); // knob just below the bottom hand
   }
+
+  figScale(f) { return f.fig.scale.x; }
 
   _placeBatGround(x, z) {
     this.bat.scale.set(1, 1, 1);

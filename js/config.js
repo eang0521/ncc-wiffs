@@ -23,6 +23,7 @@ export const FIELD = {
   zoneHeight: 28 * IN,
   zoneBottom: 17 * IN,
   pvcRadius: 0.5 * IN,          // ~1" PVC pipe
+  plateGap: 2 * IN,             // tin plate hangs inside the frame, zip-tied with this gap to the pipes
   backstopBehindZone: 4 * FT,
   backstopSize: 7 * FT,         // 7x7 ft
   fencePanels: [60, 65, 70, 65, 60].map((d) => d * FT), // left -> right
@@ -35,6 +36,8 @@ FIELD.backstopZ = FIELD.zoneZ - FIELD.backstopBehindZone;
 FIELD.moundZ = FIELD.moundToZone + FIELD.zoneZ; // 31 ft in front of home
 FIELD.zoneTop = FIELD.zoneBottom + FIELD.zoneHeight;
 FIELD.zoneCenterY = FIELD.zoneBottom + FIELD.zoneHeight / 2;
+FIELD.plateW = FIELD.zoneWidth - 2 * FIELD.plateGap;
+FIELD.plateH = FIELD.zoneHeight - 2 * FIELD.plateGap;
 
 const half = (FIELD.foulAngleDeg / 2) * Math.PI / 180;
 FIELD.foulHalfAngle = half;

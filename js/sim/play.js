@@ -132,6 +132,7 @@ export function simulatePlay(ctx) {
   let fairState = 'pending';    // 'pending' | 'fair' | 'foul'
   let batted = true;            // ball still the original batted ball (no fielder touch yet)
   let groundedEver = false;
+  let behindHome = false;      // batted ball reached the zone plane (foul, dead)
   let t = 0;
   let intercepts = null, nextIntercept = 0;
   let endTimer = 0;
@@ -638,6 +639,7 @@ export function simulatePlay(ctx) {
           if (batted) { fairState = 'foul'; }
         } else if (e.type === 'zoneCross') {
           if (batted && !groundedEver && e.inZone && ctx.contact.v[2] < 0) res.foulTipZone = true;
+          if (batted) { fairState = 'foul'; behindHome = true; }
         } else if (e.type === 'rest') {
           intercepts = null; nextIntercept = t;
         }
@@ -651,7 +653,7 @@ export function simulatePlay(ctx) {
         else if (groundedEver && proj >= segLen(0)) resolveFair(ball.p[0], ball.p[2], false);
         else if (ball.atRest) resolveFair(ball.p[0], ball.p[2], false);
       }
-      if (fairState === 'foul' && batted && (groundedEver || ball.p[2] < BEHIND)) {
+      if (fairState === 'foul' && batted && (groundedEver || behindHome || ball.p[2] < BEHIND)) {
         // foul: dead unless it can still be caught in the air (not possible once grounded)
         deadFoul();
         break;
