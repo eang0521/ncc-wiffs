@@ -133,6 +133,17 @@ export class FieldView {
     this.controls.enabled = false;
     this.controls.target.set(0, 0, 8);
     this.cameraMode = 'auto';
+    // Keyboard flying for the free camera (WASD / arrows, Q/E down/up, Shift = faster)
+    this.keys = new Set();
+    const FLY_KEYS = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyQ', 'KeyE', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ShiftLeft', 'ShiftRight']);
+    const typing = (e) => e.target.closest?.('input,select,textarea');
+    window.addEventListener('keydown', (e) => {
+      if (this.cameraMode !== 'free' || typing(e) || !FLY_KEYS.has(e.code) || !this.container.offsetParent) return;
+      this.keys.add(e.code);
+      if (e.code.startsWith('Arrow')) e.preventDefault();   // don't scroll the page
+    });
+    window.addEventListener('keyup', (e) => this.keys.delete(e.code));
+    window.addEventListener('blur', () => this.keys.clear());
     this.speed = 1;
     this.paused = false;
     this.showLabels = true;
@@ -747,8 +758,31 @@ export class FieldView {
     this._snapCam = true;
   }
 
+  /** Move the free camera (and the point it orbits) relative to where it's facing. */
+  _flyFree(rdt) {
+    const k = this.keys;
+    if (!k.size) return;
+    const fwd = (k.has('KeyW') || k.has('ArrowUp') ? 1 : 0) - (k.has('KeyS') || k.has('ArrowDown') ? 1 : 0);
+    const right = (k.has('KeyD') || k.has('ArrowRight') ? 1 : 0) - (k.has('KeyA') || k.has('ArrowLeft') ? 1 : 0);
+    const up = (k.has('KeyE') ? 1 : 0) - (k.has('KeyQ') ? 1 : 0);
+    if (!fwd && !right && !up) return;
+    const speed = (k.has('ShiftLeft') || k.has('ShiftRight') ? 22 : 8) * rdt;   // m/s
+    const dir = new THREE.Vector3();
+    this.camera.getWorldDirection(dir);
+    dir.y = 0;
+    if (dir.lengthSq() < 1e-6) dir.set(0, 0, 1); else dir.normalize();       // looking straight down
+    const side = new THREE.Vector3().crossVectors(dir, new THREE.Vector3(0, 1, 0)).normalize();
+    const move = new THREE.Vector3().addScaledVector(dir, fwd).addScaledVector(side, right).addScaledVector(new THREE.Vector3(0, 1, 0), up);
+    if (move.lengthSq() > 1) move.normalize();
+    move.multiplyScalar(speed);
+    // stay above the grass
+    if (this.camera.position.y + move.y < 0.3) move.y = 0.3 - this.camera.position.y;
+    this.camera.position.add(move);
+    this.controls.target.add(move);
+  }
+
   _updateCamera(rdt) {
-    if (this.cameraMode === 'free') { this.controls.update(); return; }
+    if (this.cameraMode === 'free') { this._flyFree(rdt); this.controls.update(); return; }
     const rec = this.rec;
     const t = this.t;
     let mode = this.cameraMode;
