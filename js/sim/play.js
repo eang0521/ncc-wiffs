@@ -176,14 +176,15 @@ export function simulatePlay(ctx) {
       let best = null;
       for (const s of path) {
         if (s.p[1] > CATCH_H) continue;
+        if (FIELD.beyondFence(s.p[0], s.p[2]) > 0.3) continue;   // can't run through the fence
         const d = dist2(f.pos, [s.p[0], s.p[2]]) - REACH * 0.8;
         const need = Math.max(0, f.react - t) + travelTime(d, f.vmax, f.acc);
-        if (need <= s.t) { best = { t: s.t, pt: [s.p[0], s.p[2]], air: s.p[1] > 0.3 && !s.ground && !ball.grounded }; break; }
+        if (need <= s.t) { best = { t: s.t, pt: FIELD.clampInsideFence([s.p[0], s.p[2]]), air: s.p[1] > 0.3 && !s.ground && !ball.grounded }; break; }
       }
       if (!best) {
         const last = path[path.length - 1];
         const d = dist2(f.pos, [last.p[0], last.p[2]]) - REACH * 0.8;
-        best = { t: Math.max(last.t, Math.max(0, f.react - t) + travelTime(d, f.vmax, f.acc)), pt: [last.p[0], last.p[2]], air: false };
+        best = { t: Math.max(last.t, Math.max(0, f.react - t) + travelTime(d, f.vmax, f.acc)), pt: FIELD.clampInsideFence([last.p[0], last.p[2]]), air: false };
       }
       out.set(f.id, best);
     }
@@ -476,6 +477,14 @@ export function simulatePlay(ctx) {
     if (al > maxDv) { f.vel[0] += ax / al * maxDv; f.vel[1] += az / al * maxDv; }
     else { f.vel[0] = desired[0]; f.vel[1] = desired[1]; }
     f.pos[0] += f.vel[0] * dt; f.pos[1] += f.vel[1] * dt;
+    // the fence is solid: stop at its face and lose the velocity pushing into it
+    const inside = FIELD.clampInsideFence(f.pos);
+    if (inside !== f.pos) {
+      const nx = f.pos[0] - inside[0], nz = f.pos[1] - inside[1], nl = Math.hypot(nx, nz) || 1;
+      const vn = (f.vel[0] * nx + f.vel[1] * nz) / nl;
+      if (vn > 0) { f.vel[0] -= vn * nx / nl; f.vel[1] -= vn * nz / nl; }
+      f.pos = inside;
+    }
     if (f.animT > 0) { f.animT -= dt; if (f.animT <= 0) f.anim = 0; }
     if (f.anim === 0 || f.anim === 1) f.anim = Math.hypot(...f.vel) > 0.6 ? 1 : 0;
     if (holder === f && f.anim < 2) f.anim = Math.hypot(...f.vel) > 0.6 ? 1 : 4;
@@ -718,7 +727,23 @@ export function simulatePlay(ctx) {
     if (step % REC_EVERY === 0) snapshot();
     t += DT; step++;
   }
-  snapshot();
+  // Visual tail for dead balls (fouls, home runs, ground-rule doubles): the ball keeps bouncing and
+  // rolling naturally while everyone eases to a stop. No randomness, no effect on the result.
+  if (record && res.deadBall && !holder) {
+    const t0 = t;
+    while (t < t0 + 1.5 && !ball.atRest) {
+      stepBall(ball, DT, null);
+      for (const f of F) {
+        f.vel[0] *= 0.94; f.vel[1] *= 0.94;
+        f.pos = FIELD.clampInsideFence([f.pos[0] + f.vel[0] * DT, f.pos[1] + f.vel[1] * DT]);
+        f.anim = Math.hypot(...f.vel) > 0.6 ? 1 : 0;
+      }
+      if (step % REC_EVERY === 0) snapshot();
+      t += DT; step++;
+    }
+    snapshot();
+    t = t0;
+  } else snapshot();
 
   // Stalemate safety: runners still between bases go to the nearer base
   for (const r of liveRunners()) {

@@ -91,6 +91,22 @@ FIELD.fenceCenters = fence.centers;
 FIELD.fenceRadiusAt = fence.radiusAt;
 FIELD.fenceSector = fence.sector;
 
+/** Keep a point (engine [x, z]) on the field side of the fence, `margin` meters off its face. */
+FIELD.clampInsideFence = (p, margin = 0.35) => {
+  const ang = Math.atan2(p[0], p[1]);
+  if (p[1] <= 0 || Math.abs(ang) > half) return p;           // foul ground: no fence there
+  const r = Math.hypot(p[0], p[1]);
+  const R = fence.radiusAt(ang) - margin;
+  if (r <= R) return p;
+  return [p[0] * R / r, p[1] * R / r];
+};
+/** Distance beyond the fence face (positive = outside the field), fair territory only. */
+FIELD.beyondFence = (x, z) => {
+  const ang = Math.atan2(x, z);
+  if (z <= 0 || Math.abs(ang) > half) return -Infinity;
+  return Math.hypot(x, z) - fence.radiusAt(ang);
+};
+
 // ---------------- Ball / physics ----------------
 export const BALL = {
   mass: 0.0215,           // ~0.75 oz baseball-size perforated plastic ball

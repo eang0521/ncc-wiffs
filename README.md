@@ -80,6 +80,16 @@ node tools/tune.mjs         # pitch/swing/exit-velocity calibration by tier
 node tools/season.mjs       # simulate a full season + playoffs
 ```
 
+### Cache busting
+
+GitHub Pages serves files with a 10-minute cache. `node tools/stamp.mjs` rewrites the import map in `index.html` so every module, the stylesheet and the entry script carry a `?v=<content hash>`. Changed files are then always fetched fresh. Run it before committing, or install the hook:
+
+```bash
+printf '#!/bin/sh
+node tools/stamp.mjs >/dev/null && git add index.html
+' > .git/hooks/pre-commit
+```
+
 ## Deploying to GitHub Pages
 
 ```bash

@@ -5,6 +5,7 @@ import { RNG, clamp } from '../util/rng.js';
 import { choosePitch, buildPitch, fatigueLevel, speedRuling, familiarityFrac, PITCH_TYPES } from './pitching.js';
 import { batterAction } from './batting.js';
 import { simulatePlay } from './play.js';
+import { makeBall, stepBall } from './physics.js';
 import { pitchingOverall } from '../data/players.js';
 
 const ROLE_NAMES = { P: 'P', '1B': '1B', SS: 'SS', OF: 'OF' };
@@ -232,6 +233,18 @@ export class Game {
       const fr = [];
       let nextT = 0;
       for (const s of act.path) if (s.t >= nextT) { fr.push({ t: s.t, b: s.p }); nextT += 1 / 120; }
+      if (!act.contact) {
+        // Visual tail: keep the ball bouncing/rolling after it hits the zone, tin, backstop or grass.
+        // Deterministic and separate from the game state, so watching never changes results.
+        const last = act.path[act.path.length - 1];
+        const b = makeBall(last.p, last.v);
+        b.t = last.t; b.grounded = last.grounded;
+        const stopAt = (act.cross?.t ?? last.t) + 1.4;
+        while (b.t < stopAt && !b.atRest) {
+          stepBall(b, 1 / 240);
+          if (b.t >= nextT) { fr.push({ t: b.t, b: [...b.p] }); nextT += 1 / 120; }
+        }
+      }
       rec.frames = fr;
     }
 

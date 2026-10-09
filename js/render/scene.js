@@ -462,7 +462,7 @@ export class FieldView {
     const contactT = rec.contact ? rec.contact.t : null;
     this.contactT = contactT;
     const pitchEnd = rec.frames[rec.frames.length - 1].t;
-    this.endT = (rec.play ? contactT + rec.play.frames[rec.play.frames.length - 1].t : pitchEnd) + (rec.play ? 1.1 : 0.7);
+    this.endT = (rec.play ? contactT + rec.play.frames[rec.play.frames.length - 1].t : pitchEnd) + (rec.play ? 0.9 : 0.25);
     // event timeline
     const evs = [];
     evs.push({ t: 0.02, type: 'release' });
