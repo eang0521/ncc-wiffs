@@ -1,6 +1,6 @@
 // League persistence (browser localStorage). Everything degrades gracefully if storage is blocked.
 import { generateLeague, normalizePlayer } from './data/players.js';
-import { TEAM_DEFS } from './data/teams.js';
+import { TEAM_DEFS, teamAbbr } from './data/teams.js';
 
 const LEAGUE_KEY = 'ncc-wiffs.league.v1';
 const SEASON_KEY = 'ncc-wiffs.season.v1';
@@ -13,7 +13,7 @@ function remove(key) { try { localStorage.removeItem(key); } catch { /* ignore *
 export function loadLeague() {
   const saved = read(LEAGUE_KEY);
   if (saved && Array.isArray(saved.teams) && saved.teams.length) {
-    saved.teams.forEach((t) => { t.players = (t.players || []).map(normalizePlayer); });
+    saved.teams.forEach((t) => { t.players = (t.players || []).map(normalizePlayer); t.abbr = teamAbbr(t.name); });
     return saved.teams;
   }
   return generateLeague();
@@ -29,13 +29,17 @@ export function importLeagueJSON(text) {
   return teams.map((t, i) => ({
     id: t.id || TEAM_DEFS[i]?.id || `T${i}`,
     name: String(t.name || TEAM_DEFS[i]?.name || `Team ${i + 1}`),
-    abbr: String(t.abbr || (t.name || 'TM').slice(0, 3).toUpperCase()),
+    abbr: teamAbbr(t.name || TEAM_DEFS[i]?.name),
     color: /^#[0-9a-f]{6}$/i.test(t.color || '') ? t.color : (TEAM_DEFS[i]?.color || '#888888'),
     players: (t.players || []).map(normalizePlayer),
   }));
 }
 
-export const loadSeason = () => read(SEASON_KEY);
+export const loadSeason = () => {
+  const s = read(SEASON_KEY);
+  if (s?.teams) s.teams.forEach((t) => { t.abbr = teamAbbr(t.name); });
+  return s;
+};
 export const saveSeason = (s) => write(SEASON_KEY, s);
 export const clearSeason = () => remove(SEASON_KEY);
 export const loadPrefs = () => read(PREFS_KEY) || {};

@@ -4,6 +4,7 @@ import { TIERS, generatePlayer, generateRoster, normalizePlayer, playersToCSV, p
 import { PITCH_TYPES, PITCH_KEYS, ARM_SLOTS } from '../sim/pitching.js';
 import { saveLeague, exportLeagueJSON, importLeagueJSON, resetLeague } from '../store.js';
 import { RNG } from '../util/rng.js';
+import { teamAbbr } from '../data/teams.js';
 
 function download(name, text, type = 'application/json') {
   const blob = new Blob([text], { type });
@@ -65,7 +66,7 @@ export class TeamsView {
       <div class="panel">
         <div class="team-meta">
           <label>Team name <input data-team="name" value="${esc(t.name)}" /></label>
-          <label>Abbr <input data-team="abbr" value="${esc(t.abbr)}" maxlength="4" style="width:70px" /></label>
+          <label title="Always the first 3 letters of the team name">Abbr <input id="team-abbr" value="${esc(t.abbr)}" readonly tabindex="-1" style="width:70px;opacity:.75" /></label>
           <label>Color <input type="color" data-team="color" value="${t.color}" /></label>
           <span class="sp" style="flex:1"></span>
           <button data-act="addplayer">+ Add player</button>
@@ -103,6 +104,11 @@ export class TeamsView {
     const t = this.teams[this.sel];
     if (el.dataset.team) {
       t[el.dataset.team] = el.value;
+      if (el.dataset.team === 'name') {
+        t.abbr = teamAbbr(el.value);
+        const ab = this.root.querySelector('#team-abbr');
+        if (ab) ab.value = t.abbr;
+      }
       this.save();
       if (isChange) this.render();
       return;
