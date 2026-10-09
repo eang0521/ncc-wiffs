@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/style.css?v=e267a14e04" />
+  <link rel="stylesheet" href="css/style.css?v=41ef61f975" />
   <script type="importmap">
     {
       "imports": {
@@ -30,7 +30,7 @@
         "./js/sim/play.js": "./js/sim/play.js?v=92bf04b2dc",
         "./js/store.js": "./js/store.js?v=acaac4c42a",
         "./js/ui/hud.js": "./js/ui/hud.js?v=ec0f8187da",
-        "./js/ui/live.js": "./js/ui/live.js?v=367aa900c0",
+        "./js/ui/live.js": "./js/ui/live.js?v=9e10824bab",
         "./js/ui/seasonView.js": "./js/ui/seasonView.js?v=ab8e1dacd1",
         "./js/ui/teams.js": "./js/ui/teams.js?v=162f2fdd9b",
         "./js/util/rng.js": "./js/util/rng.js?v=7aeea3a09e",
@@ -80,7 +80,7 @@
 
     <!-- ============ GAME SCREEN (shared by exhibition & season) ============ -->
     <section id="game-screen" class="game hidden">
-      <div class="game-head"><div id="game-title"></div><button id="btn-exit" class="ghost">✕ Exit game</button></div>
+      <div class="game-head"><div id="game-title"></div><div class="row"><button id="btn-final" title="Show the final score again">Final score</button><button id="btn-exit" class="ghost">✕ Exit game</button></div></div>
       <div class="game-grid">
         <div class="stage-wrap">
           <div id="stage"></div>
@@ -91,7 +91,7 @@
             <canvas id="zone" width="150" height="180" title="Strike zone (catcher's view)"></canvas>
             <div id="atbat" class="atbat"></div>
             <div id="ticker" class="ticker"></div>
-            <div id="final" class="final hidden"></div>
+            <div id="final" class="final-overlay hidden"></div>
           </div>
         </div>
         <aside class="controls">

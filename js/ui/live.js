@@ -49,8 +49,10 @@ export class LiveGame {
       const s = e.target.closest('[data-mgr]');
       if (s && this.game) { this.game.manager[Number(s.dataset.mgr)] = s.value; }
     });
+    $('#btn-final', r).onclick = () => { if (this.game?.over) $('#final', r).classList.remove('hidden'); };
     document.addEventListener('keydown', (e) => {
-      if (!this.game || this.root.classList.contains('hidden') || e.target.closest('input,select,textarea')) return;
+      if (!this.game || this.root.classList.contains('hidden') || e.target.closest?.('input,select,textarea')) return;
+      if (e.key === 'Escape') { $('#final', r).classList.add('hidden'); return; }
       if (e.code === 'Space') { e.preventDefault(); this.togglePlay(); }
       if (e.key === 'n') $('#btn-step', r).click();
     });
@@ -75,6 +77,7 @@ export class LiveGame {
     this.root.querySelectorAll('[data-cam]').forEach((x) => x.classList.toggle('active', x.dataset.cam === 'auto'));
     this.setSpeed(this.speedIdx);
     $('#final', this.root).classList.add('hidden');
+    this.root.classList.remove('over');
     $('#game-title', this.root).innerHTML = `${chip(game.teams[0].def)} ${esc(game.teams[0].def.name)} <span class="at">at</span> ${chip(game.teams[1].def)} ${esc(game.teams[1].def.name)}${opts.label ? ` <small>· ${esc(opts.label)}</small>` : ''}`;
     this.playing = true;
     this._updatePlayBtn();
@@ -228,6 +231,8 @@ export class LiveGame {
   finish() {
     clearTimeout(this.timer);
     const g = this.game;
+    if (this._finished === g) return;
+    this._finished = g;
     this.snap = g.snapshot();
     this.visibleLog = g.log.length;
     this.refresh();
@@ -236,6 +241,7 @@ export class LiveGame {
     const nm = (id) => (id ? esc(g.player(id).name) : '—');
     const el = $('#final', this.root);
     el.innerHTML = `<div class="final-card">
+      <button class="final-x" data-act="close" title="Close (Esc)" aria-label="Close">✕</button>
       <div class="final-h">FINAL${g.inning > g.innings ? ` / ${g.inning}` : ''}</div>
       <div class="final-score">${chip(g.teams[0].def)} <b>${g.score[0]}</b> <span>–</span> <b>${g.score[1]}</b> ${chip(g.teams[1].def)}</div>
       <div class="final-w">${esc(w.name)} win</div>
@@ -243,8 +249,11 @@ export class LiveGame {
       <div class="final-btns"><button data-act="box">Box score</button>${this.opts?.onBack ? '<button class="primary" data-act="back">Back to season</button>' : '<button data-act="rematch">Rematch</button><button class="primary" data-act="new">New game</button>'}</div>
     </div>`;
     el.classList.remove('hidden');
+    this.root.classList.add('over');
     el.onclick = (e) => {
+      if (e.target === el) { el.classList.add('hidden'); return; }   // click on the dimmed backdrop
       const a = e.target.closest('[data-act]')?.dataset.act;
+      if (a === 'close') el.classList.add('hidden');
       if (a === 'box') { this.showPanel('box'); el.classList.add('hidden'); }
       if (a === 'back') this.opts.onBack?.();
       if (a === 'rematch') this.opts.onRematch?.();
